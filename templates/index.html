@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>نظام رافد-آمن | غرفة العمليات الصناعية المتقدمة</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0f172a; color: #f8fafc; padding: 20px; margin: 0; }
+        .container { max-width: 1400px; margin: 0 auto; }
+        .card { background: #1e293b; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.4); margin-bottom: 20px; }
+        .safe { color: #22c55e; font-weight: bold; }
+        .alert { color: #ef4444; font-weight: bold; font-size: 1.1em; }
+        .top-section { text-align: center; }
+        .metrics { display: flex; justify-content: space-around; margin: 15px 0; gap: 10px; }
+        .metric-box { background: #0f172a; padding: 12px; border-radius: 8px; flex: 1; border: 1px solid #334155; }
+        .metric-value { font-size: 1.3em; font-weight: bold; margin-top: 5px; color: #38bdf8; }
+        .grid-row { display: flex; gap: 20px; }
+        .grid-col { flex: 1; display: flex; flex-direction: column; }
+        
+        .card-header-flex { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+        
+        /* مفاتيح الإيضاح الثابتة في المنتصف تماماً ولا تتحرك مع السكرول */
+        .custom-legend { display: flex; justify-content: center; gap: 25px; margin-bottom: 10px; }
+        .legend-item { display: flex; align-items: center; gap: 8px; font-size: 0.9em; font-weight: bold; color: #cbd5e1; cursor: pointer; user-select: none; transition: 0.2s; }
+        .legend-item:hover { color: #ffffff; }
+        .legend-box { width: 16px; height: 16px; border-radius: 4px; display: inline-block; }
+
+        .action-btn { background: #0284c7; color: #ffffff; border: none; padding: 7px 14px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 0.85em; transition: 0.2s; text-decoration: none; display: inline-block; }
+        .action-btn:hover { background: #0369a1; transform: translateY(-1px); }
+        .btn-green { background: #16a34a; }
+        .btn-green:hover { background: #15803d; }
+        
+        .chart-container { height: 320px; position: relative; width: 100%; flex-grow: 1; overflow-x: auto; }
+        #chartInnerWrapper { min-width: 100%; height: 100%; }
+        
+        .table-container { max-height: 320px; overflow-y: auto; border-radius: 8px; border: 1px solid #334155; flex-grow: 1; }
+        table { width: 100%; border-collapse: collapse; background: #0f172a; }
+        th, td { padding: 9px; border-bottom: 1px solid #334155; font-size: 0.85em; text-align: center; }
+        th { background: #334155; color: #f8fafc; position: sticky; top: 0; z-index: 1; }
+        .badge-safe { background: #22c55e22; color: #22c55e; padding: 3px 8px; border-radius: 4px; font-weight: bold; }
+        .badge-alert { background: #ef444422; color: #ef4444; padding: 3px 8px; border-radius: 4px; font-weight: bold; }
+        
+        canvas {
+            width: 100% !important;
+            height: 100% !important;
+        }
+
+        @media print {
+            body { background: #ffffff !important; color: #000000 !important; padding: 0; }
+            .action-btn { display: none !important; }
+            .card { background: #ffffff !important; color: #000000 !important; box-shadow: none !important; border: 1px solid #94a3b8; }
+            .metric-box { background: #f8fafc !important; border: 1px solid #cbd5e1 !important; color: #000000 !important; }
+            .metric-value { color: #0284c7 !important; }
+            h2, h3, p, .legend-item { color: #0f172a !important; }
+            table { background: #ffffff !important; color: #000000 !important; border: 1px solid #cbd5e1; }
+            th { background: #e2e8f0 !important; color: #000000 !important; border: 1px solid #cbd5e1; }
+            td { border-bottom: 1px solid #cbd5e1 !important; color: #000000 !important; }
+            .table-container { max-height: none !important; overflow: visible !important; }
+            .chart-container { height: 400px !important; overflow: visible !important; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- قسم المؤشرات العلوية -->
+        <div class="card top-section">
+            <h2>💧 نظام رافد-آمن (SmartWater-ICS) - غرفة العمليات</h2>
+            <p>تقرير مراقبة أمن شبكات المياه عبر بروتوكول Modbus الصناعي ونموذج الذكاء الاصطناعي</p>
+            <hr style="border:0; border-top:1px solid #334155; margin: 15px 0;">
+            <div class="metrics">
+                <div class="metric-box">
+                    <div>ضغط الشبكة (Pressure)</div>
+                    <div id="pressure-val" class="metric-value">-- بار</div>
+                </div>
+                <div class="metric-box">
+                    <div>معدل التدفق (Flow Rate)</div>
+                    <div id="flow-val" class="metric-value">-- م³/ساعة</div>
+                </div>
+                <div class="metric-box">
+                    <div>حالة اتصال PLC</div>
+                    <div id="plc-status" class="metric-value" style="font-size: 1.1em; margin-top: 6px;">--</div>
+                </div>
+                <div class="metric-box">
+                    <div>إجمالي التنبيهات المرصودة</div>
+                    <div id="alert-counter" class="metric-value" style="color: #ef4444;">0</div>
+                </div>
+            </div>
+            <p style="font-size: 1em; margin: 10px 0;">حالة النظام التشغيلي: <span id="status-text">جاري الاتصال بالسيرفر...</span></p>
+            <p id="msg-text" style="color: #94a3b8; font-size: 0.85em; margin: 0;"></p>
+        </div>
+
+        <!-- قسم الرسم البياني والجدول (جنباً إلى جنب) -->
+        <div class="grid-row">
+            <!-- عمود الرسم البياني -->
+            <div class="card grid-col">
+                <div class="card-header-flex">
+                    <button class="action-btn" onclick="exportPureChartImage()">تصدير الرسم البياني</button>
+                    <span style="font-size: 0.85em; color: #94a3b8;">إمكانية التمرير الأفقي ↔</span>
+                </div>
+                
+                <!-- مفاتيح الإيضاح الثابتة في المنتصف تماماً -->
+                <div class="custom-legend">
+                    <div class="legend-item" onclick="toggleDataset(0)">
+                        <span class="legend-box" style="background: #0284c7;"></span>
+                        الضغط (Pressure - بار)
+                    </div>
+                    <div class="legend-item" onclick="toggleDataset(1)">
+                        <span class="legend-box" style="background: #16a34a;"></span>
+                        معدل التدفق (Flow Rate - م³/س)
+                    </div>
+                </div>
+
+                <div class="chart-container">
+                    <div id="chartInnerWrapper" style="width: 100%; height: 100%;">
+                        <canvas id="telemetryChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- عمود جدول التنبيهات -->
+            <div class="card grid-col" style="text-align: right;">
+                <div class="card-header-flex">
+                    <a href="/api/export-full-history" class="action-btn btn-green">
+                        📥 تصدير السجل الشامل (CSV)
+                    </a>
+                    <h3 style="margin: 0; font-size: 1.1em;">📋 سجل الأحداث الشامل (منذ بدء التشغيل)</h3>
+                </div>
+                <div class="table-container">
+                    <table id="log-table-element">
+                        <thead>
+                            <tr>
+                                <th>الوقت</th>
+                                <th>الضغط</th>
+                                <th>التدفق</th>
+                                <th>الحالة</th>
+                            </tr>
+                        </thead>
+                        <tbody id="log-table">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const ctx = document.getElementById('telemetryChart').getContext('2d');
+        const telemetryChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [
+                    {
+                        label: 'الضغط (Pressure - بار)',
+                        borderColor: '#0284c7',
+                        backgroundColor: 'rgba(2, 132, 199, 0.15)',
+                        data: [],
+                        tension: 0.15,
+                        fill: true,
+                        borderWidth: 2,
+                        pointRadius: 2
+                    },
+                    {
+                        label: 'معدل التدفق (Flow Rate - م³/س)',
+                        borderColor: '#16a34a',
+                        backgroundColor: 'rgba(22, 163, 74, 0.15)',
+                        data: [],
+                        tension: 0.15,
+                        fill: true,
+                        borderWidth: 2,
+                        pointRadius: 2
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: { 
+                        ticks: { color: '#cbd5e1', font: { size: 10, weight: '500' } }, 
+                        grid: { color: '#334155', borderDash: [4, 4] } 
+                    },
+                    y: { 
+                        ticks: { color: '#cbd5e1', font: { size: 10, weight: '500' } }, 
+                        grid: { color: '#334155', borderDash: [4, 4] } 
+                    }
+                },
+                plugins: { 
+                    legend: { display: false } 
+                }
+            }
+        });
+
+        function toggleDataset(index) {
+            const meta = telemetryChart.getDatasetMeta(index);
+            meta.hidden = meta.hidden === null ? !telemetryChart.data.datasets[index].hidden : null;
+            telemetryChart.update();
+        }
+
+        let totalAlertsCount = 0;
+
+        async function loadFullArchive() {
+            try {
+                let response = await fetch('/api/full-telemetry-history');
+                let fullHistoryData = await response.json();
+                
+                if (!fullHistoryData || fullHistoryData.length === 0) return;
+
+                let labels = [];
+                let pressureData = [];
+                let flowData = [];
+                let tableRowsHTML = '';
+
+                fullHistoryData.forEach(record => {
+                    labels.push(record.timestamp);
+                    pressureData.push(record.pressure);
+                    flowData.push(record.flow_rate);
+
+                    let badge = record.status === 'SAFE' ? '<span class="badge-safe">SAFE</span>' : '<span class="badge-alert">ALERT</span>';
+                    if (record.status !== 'SAFE') totalAlertsCount++;
+
+                    tableRowsHTML = `<tr>
+                        <td>${record.timestamp}</td>
+                        <td>${record.pressure}</td>
+                        <td>${record.flow_rate}</td>
+                        <td>${badge}</td>
+                    </tr>` + tableRowsHTML;
+                });
+
+                document.getElementById('alert-counter').innerText = totalAlertsCount;
+
+                telemetryChart.data.labels = labels;
+                telemetryChart.data.datasets[0].data = pressureData;
+                telemetryChart.data.datasets[1].data = flowData;
+                
+                const dynamicWidth = Math.max(100, labels.length * 3);
+                document.getElementById('chartInnerWrapper').style.width = dynamicWidth + '%';
+                telemetryChart.update();
+
+                document.getElementById('log-table').innerHTML = tableRowsHTML;
+            } catch (err) {
+                console.error("خطأ في جلب الأرشيف", err);
+            }
+        }
+
+        // دالة تصدير الرسم البياني الفعلي الصافي مع رسم المفاتيح فوقه برمجياً
+        // دالة تصدير الرسم البياني الفعلي بخلفية بيضاء نقية وتصميم هندسي رسمي
+        function exportPureChartImage() {
+            const chartCanvasUrl = telemetryChart.toBase64Image();
+            const img = new Image();
+            img.onload = function() {
+                const exportCanvas = document.createElement('canvas');
+                exportCanvas.width = img.width;
+                exportCanvas.height = img.height + 60;
+                const eCtx = exportCanvas.getContext('2d');
+
+                // تعبئة الخلفية باللون الأبيض النقي للتقارير الهندسية
+                eCtx.fillStyle = '#ffffff';
+                eCtx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+
+                // رسم الكانفاس الخاص بالرسم البياني
+                eCtx.drawImage(img, 0, 60);
+
+                // رسم مفاتيح الإيضاح في المنتصف بلون نصي واضح ومناسب للخلفية البيضاء
+                eCtx.font = 'bold 16px "Segoe UI", Tahoma, sans-serif';
+                eCtx.textBaseline = 'middle';
+
+                // عنصر الضغط
+                eCtx.fillStyle = '#0284c7';
+                eCtx.fillRect(exportCanvas.width / 2 - 280, 25, 20, 20);
+                eCtx.fillStyle = '#0f172a';
+                eCtx.fillText('الضغط (Pressure - بار)', exportCanvas.width / 2 - 250, 35);
+
+                // عنصر التدفق
+                eCtx.fillStyle = '#16a34a';
+                eCtx.fillRect(exportCanvas.width / 2 + 50, 25, 20, 20);
+                eCtx.fillStyle = '#0f172a';
+                eCtx.fillText('معدل التدفق (Flow Rate - م³/س)', exportCanvas.width / 2 + 80, 35);
+
+                const imageLink = document.createElement('a');
+                imageLink.download = 'ICS_Telemetry_Engineering_Chart.png';
+                imageLink.href = exportCanvas.toDataURL('image/png');
+                document.body.appendChild(imageLink);
+                imageLink.click();
+                document.body.removeChild(imageLink);
+            };
+            img.src = chartCanvasUrl;
+        }
+
+        async function fetchLiveData() {
+            try {
+                let response = await fetch('/api/stream');
+                let data = await response.json();
+                
+                document.getElementById('pressure-val').innerText = data.pressure + " بار";
+                document.getElementById('flow-val').innerText = data.flow_rate + " م³/ساعة";
+                
+                let plcSpan = document.getElementById('plc-status');
+                if (data.plc_connected) {
+                    plcSpan.innerHTML = '<span style="color: #22c55e;">🟢 متصل (Online)</span>';
+                } else {
+                    plcSpan.innerHTML = '<span style="color: #ef4444;">🔴 مقطوع (Offline)</span>';
+                }
+                
+                let statusSpan = document.getElementById('status-text');
+                if (data.status === 'SAFE') {
+                    statusSpan.innerHTML = '<span class="safe">✅ آمن (Normal ICS Operations)</span>';
+                } else {
+                    statusSpan.innerHTML = '<span class="alert">⚠️ خطر / هجوم شذوذ (Modbus ICS Alert)</span>';
+                    totalAlertsCount++;
+                    document.getElementById('alert-counter').innerText = totalAlertsCount;
+                }
+                
+                document.getElementById('msg-text').innerText = data.message;
+
+                telemetryChart.data.labels.push(data.timestamp);
+                telemetryChart.data.datasets[0].data.push(data.pressure);
+                telemetryChart.data.datasets[1].data.push(data.flow_rate);
+                
+                const newWidth = Math.max(100, telemetryChart.data.labels.length * 3);
+                document.getElementById('chartInnerWrapper').style.width = newWidth + '%';
+                telemetryChart.update();
+
+                let table = document.getElementById('log-table');
+                let badge = data.status === 'SAFE' ? '<span class="badge-safe">SAFE</span>' : '<span class="badge-alert">ALERT</span>';
+                let row = `<tr>
+                    <td>${data.timestamp}</td>
+                    <td>${data.pressure}</td>
+                    <td>${data.flow_rate}</td>
+                    <td>${badge}</td>
+                </tr>`;
+                
+                table.innerHTML = row + table.innerHTML;
+            } catch (err) {
+                console.error("Error fetching live data");
+            }
+        }
+
+        window.onload = function() {
+            loadFullArchive();
+        };
+
+        setInterval(fetchLiveData, 2000);
+    </script>
+</body>
+</html>
