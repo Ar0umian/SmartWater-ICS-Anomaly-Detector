@@ -13,11 +13,10 @@
 ---
 
 ## 📸 معاينة النظام (System Demo)
-<!-- 
+
 <p align="center">
-  <img src="https://github.com/Ar0umian/demo/blob/main/SmartWater-ICS.gif" alt="SmartWater-ICS Demo" width="850">
+  <img src="https://github.com/Ar0umian/demo/blob/main/SmartWater-ICS.gif" alt="SmartWater-ICS Demo">
 </p>
--->
 
 ---
 
